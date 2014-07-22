@@ -1,0 +1,164 @@
+{
+  "AWSTemplateFormatVersion":"2010-09-09",
+  "Description":"Nested Stack",
+  "Parameters":{
+    "Project":{
+       "Description":"Name of Project",
+       "Type":"String",
+       "Default":"CFN-Training"
+    },
+    "KeyPair" : {
+        "Description" : "KeyPair Name for Instances.",
+        "Type" : "String",
+        "Default" : "",
+        "ConstraintDescription" : "must be a existing Key Pair."
+    },
+    "BucketName":{
+       "Description":"Name of Config Bucket",
+       "Type":"String",
+       "Default":"intuit-training"
+    },
+    "AppMaxAppCount":{
+       "Description":"Maximum Sync App Servers in Sync ASG.",
+       "Type":"Number",
+       "Default":"4"
+    },
+    "AppMinAppCount":{
+       "Description":"Minimum Sync App Servers in Sync ASG.",
+       "Type":"Number",
+       "Default":"2",
+       "ConstraintDescription":"must be a valid number."
+    },
+    "AppScaleUp":{
+       "Description":"Threshold for CPU Alarm High",
+       "Type":"String",
+       "Default":"100",
+       "ConstraintDescription":"must be a valid string."
+    },
+    "AppScaleDown":{
+       "Description":"Threshold for CPU Alarm Normal",
+       "Type":"String",
+       "Default":"10",
+       "ConstraintDescription":"must be a valid string."
+    },
+    "LatencyHighScaleDown" : {
+        "Description" : "The number of seconds of latency on which to Scale Up",
+        "Type" : "Number",
+        "Default" : "5",
+        "MinValue": "3",
+        "MaxValue": "100",
+        "ConstraintDescription" : "must be a number from 3 to 100."
+    },
+    "LatencyNormalScaleDown" : {
+      "Description" : "The number of seconds of latency on which to Scale Down",
+      "Type" : "Number",
+      "Default" : "2",
+      "MinValue": "1",
+      "MaxValue": "100",
+      "ConstraintDescription" : "must be a number from 1 to 100."
+    },
+    "MaxProvisionTime":{
+         "Description":"Maximum allowable time (seconds) for the server to provision before the process is aborted and the instance destroyed.",
+         "Type":"Number",
+         "Default":"1500",
+         "MinValue":"120",
+         "MaxValue":"3600"
+    },
+    "NetworkCFNURL":{
+         "Description":"Link to Network CFN Url",
+         "Type": "String",
+         "Default": "https://s3.amazonaws.com/intuit-training/cfn-onsite/cloudformation/Network.json"
+    },
+    "AppCFNURL":{
+         "Description":"Link to App CFN URL",
+         "Type": "String",
+         "Default": "https://s3.amazonaws.com/intuit-training/cfn-onsite/cloudformation/Sync.json"
+    },
+    "DatabaseCFNURL":{
+         "Description":"Link to DatabaseURL",
+         "Type": "String",
+         "Default": "https://s3.amazonaws.com/intuit-training/cfn-onsite/cloudformation/DB.json"
+    }
+  },
+  "Mappings":{
+    "AWSRegionArch2AMI": {
+      "us-east-1":      { "64": "ami-bba18dd2" },
+      "us-west-2":      { "64": "ami-ccf297fc" },
+      "us-west-1":      { "64": "ami-a43909e1" },
+      "eu-west-1":      { "64": "ami-5256b825" },
+      "ap-southeast-1": { "64": "ami-b4baeee6" },
+      "ap-northeast-1": { "64": "ami-0d13700c" },
+      "ap-southeast-2": { "64": "ami-5ba83761" },
+      "sa-east-1":      { "64": "ami-c99130d4" }
+    }
+  },
+  "Resources":{
+    "Network":{
+      "Type":"AWS::CloudFormation::Stack",
+       "Properties":{
+         "TemplateURL": { "Ref" : "NetworkCFNURL" },
+         "Parameters":{
+           "Project": { "Ref": "Project" },
+           "BastionSSHFrom" : "0.0.0.0/0",
+           "BucketName": { "Ref": "BucketName" },
+           "KeyPair": { "Ref": "KeyPair" },
+           "AMIID" : {"Fn::FindInMap": ["AWSRegionArch2AMI", {"Ref": "AWS::Region"}, "64"] },
+           "NATProvisionFileName": "cfn-onsite/provisioning/Nat.sh"
+         }
+       }
+    },
+    "Database":{
+      "Type":"AWS::CloudFormation::Stack",
+      "Properties":{
+        "TemplateURL": { "Ref" : "DatabaseCFNURL" },
+        "Parameters":{
+          "VPC": { "Fn::GetAtt" : [ "Network", "Outputs.VPC" ] },
+          "VPCCIDR": { "Fn::GetAtt" : [ "Network", "Outputs.VPCCIDR" ] },
+          "KeyPair": { "Ref": "KeyPair" },
+          "AMIID" : {"Fn::FindInMap": ["AWSRegionArch2AMI", {"Ref": "AWS::Region"}, "64"] },
+          "AppInstanceProfile" : { "Fn::GetAtt" : [ "Network", "Outputs.AppInstanceProfile" ] },
+          "Az1Subnet" : { "Fn::GetAtt" : [ "Network", "Outputs.DBAz1Subnet" ] },
+          "Az2Subnet" : { "Fn::GetAtt" : [ "Network", "Outputs.DBAz2Subnet" ] },
+          "ELBAz1Subnet" : { "Fn::GetAtt" : [ "Network", "Outputs.InternalELBAz1Subnet" ] },
+          "ELBAz2Subnet" : { "Fn::GetAtt" : [ "Network", "Outputs.InternalELBAz2Subnet" ] },
+          "ProvisionFileName": "cfn-onsite/provisioning/DB.sh",
+          "BucketName" : { "Ref": "BucketName" },
+          "ConfigStartCommand": "#!/bin/bash\nchef-solo -j /root/$1.json -c /root/solo.rb >/tmp/chef-client-1.log 2>&1",
+          "ELBTarget": "TCP:3306"
+        }
+      }
+    },
+    "App": {
+      "Type": "AWS::CloudFormation::Stack",
+      "Properties": {
+        "TemplateURL": { "Ref": "AppCFNURL" },
+        "Parameters": {
+          "VPC": { "Fn::GetAtt" : [ "Network", "Outputs.VPC" ] },
+          "VPCCIDR": { "Fn::GetAtt" : [ "Network", "Outputs.VPCCIDR" ] },
+          "MultiAzStack": "True",
+          "KeyPair": { "Ref": "KeyPair" },
+          "AppInstanceProfile" : { "Fn::GetAtt" : [ "Network", "Outputs.AppInstanceProfile" ] },
+          "AppAz1Subnet" : { "Fn::GetAtt" : [ "Network", "Outputs.SyncAppAz1Subnet" ] },
+          "AppAz2Subnet" : { "Fn::GetAtt" : [ "Network", "Outputs.SyncAppAz2Subnet" ] },
+          "ELBAz1Subnet" : { "Fn::GetAtt" : [ "Network", "Outputs.PublicELBAz1Subnet" ] },
+          "ELBAz2Subnet" : { "Fn::GetAtt" : [ "Network", "Outputs.PublicELBAz2Subnet" ] },
+          "AppName" : "Sync",
+          "Environment": "Train",
+          "Project": { "Ref": "Project" },
+          "AMIID" : {"Fn::FindInMap": ["AWSRegionArch2AMI", {"Ref": "AWS::Region"}, "64"] },
+          "BucketName" : { "Ref": "BucketName" },
+          "ProvisionFileName": "cfn-onsite/provisioning/Sync.sh",
+          "ConfigStartCommand" : "#!/bin/bash\nchef-solo -j /root/Sync.json -c /root/solo.rb >/tmp/chef-client-1.log 2>&1",
+          "DatabaseELBURL": { "Fn::GetAtt" : [ "Database", "Outputs.ELBURL" ] },
+          "ELBTarget": "TCP:8080",
+          "ListenerELBPort": "8080",
+          "ListenerInstancePort": "8080",
+          "ListenerProtocol": "HTTP",
+          "ListenerInstanceProtocol": "HTTP"
+        }
+      }
+    }
+  },
+  "Outputs":{
+  }
+}
