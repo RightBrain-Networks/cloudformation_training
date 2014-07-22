@@ -67,17 +67,17 @@
     "NetworkCFNURL":{
          "Description":"Link to Network CFN Url",
          "Type": "String",
-         "Default": "https://s3.amazonaws.com/intuit-training/cfn-onsite/cloudformation/Network.json"
+         "Default": ""
     },
     "AppCFNURL":{
          "Description":"Link to App CFN URL",
          "Type": "String",
-         "Default": "https://s3.amazonaws.com/intuit-training/cfn-onsite/cloudformation/Sync.json"
+         "Default": ""
     },
     "DatabaseCFNURL":{
          "Description":"Link to DatabaseURL",
          "Type": "String",
-         "Default": "https://s3.amazonaws.com/intuit-training/cfn-onsite/cloudformation/DB.json"
+         "Default": ""
     }
   },
   "Mappings":{
