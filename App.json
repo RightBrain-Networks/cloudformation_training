@@ -35,12 +35,6 @@
        "Type": "String",
        "Default": ""
      },
-     "Environment" : {
-       "Description" : "Environment Name",
-       "Type" : "String",
-       "Default" : "",
-       "ConstraintDescription" : "must be a string."
-     },
      "AppName" : {
        "Description" : "App Name",
        "Type" : "String",
@@ -481,7 +475,7 @@
         "MaxSize" : { "Ref": "MaxAppCount" },
         "MinSize" : { "Ref": "MinAppCount" },
         "LoadBalancerNames" : [ { "Ref" : "ELB" } ],
-        "Tags" : [	{"Key" : "Name", "Value" : { "Fn::Join": [ "", [ { "Ref": "AppName" }, "-", { "Ref": "Environment" }, "-ASG" ]]}, "PropagateAtLaunch" : "true"  },
+        "Tags" : [	{"Key" : "Name", "Value" : { "Fn::Join": [ "", [ { "Ref": "AppName" }, "-ASG" ]]}, "PropagateAtLaunch" : "true"  },
                         { "Key" : "project", "Value" : { "Ref": "Project" }, "PropagateAtLaunch" : "true"  }
         ]
       },

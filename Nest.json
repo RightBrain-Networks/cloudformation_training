@@ -29,6 +29,13 @@
        "Default":"2",
        "ConstraintDescription":"must be a valid number."
     },
+    "Environment" : {
+      "Description" : "Stack Environment",
+      "Type" : "String",
+      "Default" : "Test",
+      "AllowedValues" : [ "Prod","Stage", "Test", "QA" ],
+      "ConstraintDescription" : "Value must be of Allowed Values: Prod, Stage, Test, QA"
+    },
     "AppScaleUp":{
        "Description":"Threshold for CPU Alarm High",
        "Type":"String",
@@ -143,7 +150,6 @@
           "ELBAz1Subnet" : { "Fn::GetAtt" : [ "Network", "Outputs.PublicELBAz1Subnet" ] },
           "ELBAz2Subnet" : { "Fn::GetAtt" : [ "Network", "Outputs.PublicELBAz2Subnet" ] },
           "AppName" : "Sync",
-          "Environment": "Train",
           "Project": { "Ref": "Project" },
           "AMIID" : {"Fn::FindInMap": ["AWSRegionArch2AMI", {"Ref": "AWS::Region"}, "64"] },
           "BucketName" : { "Ref": "BucketName" },
